@@ -192,9 +192,11 @@ module.exports = cls => class IdealTreeBuilder extends cls {
   }
 
   async #checkEngineAndPlatform () {
-    const { engineStrict, npmVersion, nodeVersion } = this.options
+    const { engineStrict, npmVersion, nodeVersion, omit = [] } = this.options
+    const omitSet = new Set(omit)
+
     for (const node of this.idealTree.inventory.values()) {
-      if (!node.optional) {
+      if (!node.optional && !node.shouldOmit(omitSet)) {
         try {
           // if devEngines is present in the root node we ignore the engines check
           if (!(node.isRoot && node.package.devEngines)) {
@@ -1476,11 +1478,6 @@ This is a one-time fix-up, please be patient...
     const needPrune = metaFromDisk && (mutateTree || flagsSuspect)
     if (this.#prune && needPrune) {
       this.#idealTreePrune()
-      for (const node of this.idealTree.inventory.values()) {
-        if (node.extraneous) {
-          node.parent = null
-        }
-      }
     }
 
     timeEnd()

@@ -260,7 +260,7 @@ const definitions = {
   browser: new Definition('browser', {
     default: null,
     defaultDescription: `
-    OS X: \`"open"\`, Windows: \`"start"\`, Others: \`"xdg-open"\`
+    macOS: \`"open"\`, Windows: \`"start"\`, Others: \`"xdg-open"\`
     `,
     type: [null, Boolean, String],
     description: `
@@ -1571,9 +1571,9 @@ const definitions = {
     },
   }),
   progress: new Definition('progress', {
-    default: !ciInfo.isCI,
+    default: !(ciInfo.isCI || !process.stderr.isTTY || !process.stdout.isTTY || process.env.TERM === 'dumb'),
     defaultDescription: `
-      \`true\` unless running in a known CI system
+      \`true\` when not in CI and both stderr and stdout are TTYs and not in a dumb terminal
     `,
     type: Boolean,
     description: `
@@ -1583,11 +1583,8 @@ const definitions = {
       Set to \`false\` to suppress the progress bar.
     `,
     flatten (key, obj, flatOptions) {
-      flatOptions.progress = !obj.progress ? false
-        // progress is only written to stderr but we disable it unless stdout is a tty
-        // also. This prevents the progress from appearing when piping output to another
-        // command which doesn't break anything, but does look very odd to users.
-        : !!process.stderr.isTTY && !!process.stdout.isTTY && process.env.TERM !== 'dumb'
+      // Only show progress if explicitly enabled AND we have proper TTY environment
+      flatOptions.progress = !!obj.progress && !!process.stderr.isTTY && !!process.stdout.isTTY && process.env.TERM !== 'dumb'
     },
   }),
   provenance: new Definition('provenance', {
