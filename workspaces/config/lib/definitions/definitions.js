@@ -158,7 +158,7 @@ const definitions = {
     If you do not want your scoped package to be publicly viewable (and
     installable) set \`--access=restricted\`.
 
-    Unscoped packages can not be set to \`restricted\`.
+    Unscoped packages cannot be set to \`restricted\`.
 
     Note: This defaults to not changing the current access level for existing
     packages.  Specifying a value of \`restricted\` or \`public\` during
@@ -230,12 +230,13 @@ const definitions = {
   }),
   before: new Definition('before', {
     default: null,
+    hint: '<date>',
     type: [null, Date],
     description: `
       If passed to \`npm install\`, will rebuild the npm tree such that only
-      versions that were available **on or before** the \`--before\` time get
-      installed.  If there's no versions available for the current set of
-      direct dependencies, the command will error.
+      versions that were available **on or before** the given date are
+      installed.  If there are no versions available for the current set of
+      dependencies, the command will error.
 
       If the requested version is a \`dist-tag\` and the given tag does not
       pass the \`--before\` filter, the most recent version less than or equal
@@ -397,14 +398,14 @@ const definitions = {
       \`\`\`
 
       It is _not_ the path to a certificate file, though you can set a registry-scoped
-      "cafile" path like "//other-registry.tld/:cafile=/path/to/cert.pem".
+      "certfile" path like "//other-registry.tld/:certfile=/path/to/cert.pem".
     `,
     deprecated: `
       \`key\` and \`cert\` are no longer used for most registry operations.
-      Use registry scoped \`keyfile\` and \`cafile\` instead.
+      Use registry scoped \`keyfile\` and \`certfile\` instead.
       Example:
       //other-registry.tld/:keyfile=/path/to/key.pem
-      //other-registry.tld/:cafile=/path/to/cert.crt
+      //other-registry.tld/:certfile=/path/to/cert.crt
     `,
     flatten,
   }),
@@ -461,7 +462,7 @@ const definitions = {
   depth: new Definition('depth', {
     default: null,
     defaultDescription: `
-      \`Infinity\` if \`--all\` is set, otherwise \`0\`
+      \`Infinity\` if \`--all\` is set; otherwise, \`0\`
     `,
     type: [null, Number],
     description: `
@@ -1093,10 +1094,10 @@ const definitions = {
     `,
     deprecated: `
       \`key\` and \`cert\` are no longer used for most registry operations.
-      Use registry scoped \`keyfile\` and \`cafile\` instead.
+      Use registry scoped \`keyfile\` and \`certfile\` instead.
       Example:
       //other-registry.tld/:keyfile=/path/to/key.pem
-      //other-registry.tld/:cafile=/path/to/cert.crt
+      //other-registry.tld/:certfile=/path/to/cert.crt
     `,
     flatten,
   }),
@@ -1204,7 +1205,7 @@ const definitions = {
     default: null,
     type: [null, 1, 2, 3, '1', '2', '3'],
     defaultDescription: `
-      Version 3 if no lockfile, auto-converting v1 lockfiles to v3, otherwise
+      Version 3 if no lockfile, auto-converting v1 lockfiles to v3; otherwise,
       maintain current lockfile version.`,
     description: `
       Set the lockfile format version to be used in package-lock.json and
@@ -1303,7 +1304,13 @@ const definitions = {
     flatten,
   }),
   'node-gyp': new Definition('node-gyp', {
-    default: require.resolve('node-gyp/bin/node-gyp.js'),
+    default: (() => {
+      try {
+        return require.resolve('node-gyp/bin/node-gyp.js')
+      } catch {
+        return ''
+      }
+    })(),
     defaultDescription: `
       The path to the node-gyp bin that ships with npm
     `,
@@ -1355,8 +1362,8 @@ const definitions = {
   omit: new Definition('omit', {
     default: process.env.NODE_ENV === 'production' ? ['dev'] : [],
     defaultDescription: `
-      'dev' if the \`NODE_ENV\` environment variable is set to 'production',
-      otherwise empty.
+      'dev' if the \`NODE_ENV\` environment variable is set to 'production';
+      otherwise, empty.
     `,
     type: [Array, 'dev', 'optional', 'peer'],
     description: `

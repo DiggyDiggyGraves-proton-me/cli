@@ -68,17 +68,10 @@ Use:
 ```bash
 node . exec -- <package>
 ```
-
-
-## Performance & Benchmarks
-
-We've set up an automated [benchmark](https://github.com/npm/benchmarks) integration that will run against all Pull Requests; Posting back a comment with the results of the run.
-
-**Example:**
-
-![image](https://user-images.githubusercontent.com/2818462/72312698-e2e57f80-3656-11ea-9fcf-4a8f6b97b0d1.png)
-
-You can learn more about this tool, including how to run & configure it manually, [here](https://github.com/npm/benchmarks)
+To update the snapshots run:
+```bash
+TAP_SNAPSHOT=1 node . run test
+```
 
 ## What _not_ to contribute?
 
