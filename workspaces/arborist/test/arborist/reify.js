@@ -818,6 +818,72 @@ t.test('rollbacks', { buffered: false }, t => {
     return printTree(tree)
   })
 
+  t.test('fail retiring nodes because rm fails after enotempty', t => {
+    const path = fixture(t, 'testing-bundledeps-3')
+    createRegistry(t, true)
+    const a = newArb({ path, installStrategy: 'nested' })
+    const enotempty = new Error('rename fail')
+    enotempty.code = 'ENOTEMPTY'
+    const kRenamePath = Symbol.for('renamePath')
+    const renamePath = a[kRenamePath]
+    a[kRenamePath] = (from, to) => {
+      a[kRenamePath] = renamePath
+      failRename = enotempty
+      failRm = true
+      return a[kRenamePath](from, to)
+    }
+    const kRollback = Symbol.for('rollbackRetireShallowNodes')
+    const rollbackRetireShallowNodes = a[kRollback]
+    let rolledBack = false
+    a[kRollback] = er => {
+      rolledBack = true
+      failRename = new Error('some other error')
+      failRm = false
+      t.match(er, new Error('rm fail'))
+      a[kRollback] = rollbackRetireShallowNodes
+      return a[kRollback](er).then(er => {
+        failRename = null
+        return er
+      }, er => {
+        failRename = null
+        throw er
+      })
+    }
+
+    return t.rejects(a.reify({
+      update: ['@isaacs/testing-bundledeps-parent'],
+    }), new Error('rm fail'))
+      .then(() => t.equal(rolledBack, true, 'rolled back'))
+  })
+
+  t.test('fail retiring node with enotempty, but then rm fixes it', async t => {
+    const path = fixture(t, 'testing-bundledeps-3')
+    createRegistry(t, true)
+    const a = newArb({ path, installStrategy: 'nested' })
+    const enotempty = new Error('rename fail')
+    enotempty.code = 'ENOTEMPTY'
+    const kRenamePath = Symbol.for('renamePath')
+    const renamePath = a[kRenamePath]
+    a[kRenamePath] = (from, to) => {
+      a[kRenamePath] = renamePath
+      failRenameOnce = enotempty
+      return a[kRenamePath](from, to)
+    }
+    const kRollback = Symbol.for('rollbackRetireShallowNodes')
+    const rollbackRetireShallowNodes = a[kRollback]
+    a[kRollback] = er => {
+      t.fail('should not roll back!')
+      a[kRollback] = rollbackRetireShallowNodes
+      return a[kRollback](er)
+    }
+
+    const tree = await a.reify({
+      update: ['@isaacs/testing-bundledeps-parent'],
+      save: false,
+    })
+    return printTree(tree)
+  })
+
   t.test('fail creating sparse tree', t => {
     t.teardown(() => failMkdir = null)
     const path = fixture(t, 'testing-bundledeps-3')
@@ -3596,6 +3662,62 @@ t.test('should preserve exact ranges, missing actual tree', async (t) => {
     // Set up the registry with a deep path
     const registryHost = 'https://registry.example.com'
     const registryPath = '/custom/deep/path/registry'
+    const registry = `${registryHost}${registryPath}`
+
+    tnock(t, registryHost)
+      .get(`${registryPath}/abbrev`)
+      .reply(200, abbrevPackument4)
+
+    // This is the critical test - the tarball URL in the packument doesn't have our registry path, but when replaceRegistryHost is 'always', we should get a request to this URL which includes the registry path
+    tnock(t, registryHost)
+      .get(`${registryPath}/abbrev-1.1.1.tgz`)
+      .reply(200, abbrevTGZ)
+
+    const arb = new Arborist({
+      path: resolve(testdir, 'project'),
+      registry,
+      cache: resolve(testdir, 'cache'),
+      replaceRegistryHost: 'always',
+    })
+
+    await t.resolves(arb.reify(), 'reify should complete successfully')
+  })
+
+  t.test('registry path prepending with registry path being a package name prefix', async t => {
+    // A registry path is prepended to resolved URLs that don't already have it
+    const abbrevPackument4 = JSON.stringify({
+      _id: 'abbrev',
+      _rev: 'lkjadflkjasdf',
+      name: 'abbrev',
+      'dist-tags': { latest: '1.1.1' },
+      versions: {
+        '1.1.1': {
+          name: 'abbrev',
+          version: '1.1.1',
+          dist: {
+            // Note: This URL has no path component that matches our registry path
+            tarball: 'https://external-registry.example.com/abbrev-1.1.1.tgz',
+          },
+        },
+      },
+    })
+
+    const testdir = t.testdir({
+      project: {
+        'package.json': JSON.stringify({
+          name: 'myproject',
+          version: '1.0.0',
+          dependencies: {
+            abbrev: '1.1.1',
+          },
+        }),
+      },
+    })
+
+    // Set up the registry with a deep path
+    const registryHost = 'https://registry.example.com'
+    // Note: This path is a prefix of the package name 'abbrev'
+    const registryPath = '/abb'
     const registry = `${registryHost}${registryPath}`
 
     tnock(t, registryHost)
